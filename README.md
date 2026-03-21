@@ -1,3 +1,4 @@
+
 # StellarStream 🌊
 **Real-time, linear asset streaming on the Stellar Network.**
 
@@ -69,5 +70,58 @@ StellarStream/
 │
 └── docs/                    # Technical specs and Wave assets
 ```
+
 ---
 
+## 🤝 How to Contribute
+We follow an Issue-Oriented workflow. Contributors should assign themselves to an issue before starting work.
+
+### Folder-Specific Guidelines
+
+#### 🦀 Smart Contract Engineers (/contracts)
+**Focus**: State management, security, and gas optimization.
+
+**Setup**: Requires rustup and soroban-cli.
+
+**Rule**: No logic changes without a corresponding test update. Use cargo test before submitting PRs.
+
+#### ⚛️ Frontend Developers (/frontend)
+**Focus**: UX/UI, real-time data visualization, and wallet connectivity.
+
+**Setup**: npm install inside the directory.
+
+**Rule**: Components must be responsive. Use framer-motion for the ticking number animations.
+
+#### 🗄️ Backend Engineers (/backend)
+**Focus**: Indexing performance, data persistence, and API reliability.
+
+**Setup**: Docker-compose is provided for local DB setup.
+
+**Rule**: The indexer must be idempotent and capable of handling ledger rollbacks.
+
+---
+
+## 🚦 Getting Started
+
+1. **Clone the Repository:**
+```bash
+git clone https://github.com/your-username/stellar-stream.git
+cd stellar-stream
+```
+
+2. **Build Contracts:**
+```bash
+cd contracts
+soroban contract build
+```
+
+3. **Run Frontend:**
+```bash
+cd ../frontend
+npm install
+npm run dev
+```
+
+---
+
+Built for the Drips Stellar Wave. Pushing the boundaries of real-time finance.
