@@ -79,6 +79,9 @@ impl Contract {
     fn transfer_admin_internal(env: Env, new_admin: Address) -> Result<(), Error> {
         let previous_admin = storage::try_get_admin(&env)?;
         // Auth handled in execute_op
+    pub fn transfer_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+        let previous_admin = storage::try_get_admin(&env)?;
+        previous_admin.require_auth();
 
         storage::set_admin(&env, &new_admin);
 
@@ -106,6 +109,8 @@ impl Contract {
     /// Override the minimum for a specific asset. Admin-only.
     /// Internal helper for set_min_value.
     fn set_min_value_internal(env: Env, asset: Address, min: i128) -> Result<(), Error> {
+    pub fn set_min_value(env: Env, asset: Address, min: i128) -> Result<(), Error> {
+        storage::try_get_admin(&env)?.require_auth();
         storage::set_min_value(&env, &asset, min);
         Ok(())
     }
