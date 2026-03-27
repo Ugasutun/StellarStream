@@ -78,6 +78,11 @@ export function Sidebar({ onOpenAuditLog }: SidebarProps) {
       badge: 3,
     },
     {
+      label: "Invoice Links",
+      href: "/dashboard/invoice-links",
+      icon: ClipboardCheck,
+    },
+    {
       label: "History",
       onClick: onOpenAuditLog,
       icon: HistoryIcon,
@@ -86,6 +91,11 @@ export function Sidebar({ onOpenAuditLog }: SidebarProps) {
       label: "Create Stream",
       href: "/dashboard/create-stream",
       icon: CirclePlus,
+    },
+    {
+      label: "Nebula-Pay Invoices",
+      href: "/dashboard/invoice-links",
+      icon: ClipboardCheck,
     },
     { label: "Settings", href: "/dashboard/settings", icon: Settings },
     {
