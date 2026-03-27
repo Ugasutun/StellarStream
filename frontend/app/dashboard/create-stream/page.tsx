@@ -12,6 +12,7 @@ import { InsufficientXLMCard, NetworkCongestedCard } from "@/components/error-re
 import type { RecoveryErrorType } from "@/components/error-recovery-cards";
 import { useHardwareWalletTimeout } from "@/lib/hooks/use-hardware-wallet-timeout";
 import { ConfirmOnDeviceModal } from "@/components/confirm-on-device-modal";
+import { LoadProposalDataButton } from "@/components/load-proposal-data-button";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface FormData {
@@ -282,15 +283,46 @@ function StreamSplitter({
   update: (patch: Partial<FormData>) => void;
 }) {
   const [focused, setFocused] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
 
   const addressDirty = form.splitAddress.length > 0;
   const addressValid = isValidStellarAddress(form.splitAddress);
   const addressError = addressDirty && !addressValid;
 
+  // ── Handle proposal data loading ────────────────────────────────────────────
+  const handleProposalLoaded = (recipients: Array<{ address: string; percentage: number }>) => {
+    try {
+      setProposalError(null);
+      
+      if (recipients.length === 0) {
+        setProposalError("No recipients found in proposal");
+        return;
+      }
+
+      // For now, use the first recipient (can be extended for multi-recipient support)
+      const primaryRecipient = recipients[0];
+      
+      if (!isValidStellarAddress(primaryRecipient.address)) {
+        setProposalError("Proposal contains invalid recipient address");
+        return;
+      }
+
+      // Enable split and auto-fill primary recipient
+      update({
+        splitEnabled: true,
+        splitAddress: primaryRecipient.address,
+        splitPercent: Math.min(Math.round(primaryRecipient.percentage), 50), // cap at 50%
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to load proposal";
+      setProposalError(msg);
+    }
+  };
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1">
           <p className="font-body text-[10px] tracking-[0.12em] text-white/50 uppercase">
             Split Stream
           </p>
@@ -298,14 +330,20 @@ function StreamSplitter({
             Route a portion to a second wallet
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={form.splitEnabled}
-          onClick={() => update({ splitEnabled: !form.splitEnabled })}
-          className="relative h-6 w-11 rounded-full border transition-all duration-300 focus:outline-none"
-          style={{
-            background: form.splitEnabled
+        <div className="flex items-center gap-2">
+          <LoadProposalDataButton
+            disabled={!form.splitEnabled}
+            onProposalLoaded={handleProposalLoaded}
+            onError={setProposalError}
+          />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.splitEnabled}
+            onClick={() => update({ splitEnabled: !form.splitEnabled })}
+            className="relative h-6 w-11 rounded-full border transition-all duration-300 focus:outline-none flex-shrink-0"
+            style={{
+              background: form.splitEnabled
               ? "linear-gradient(135deg, rgba(34,211,238,0.3), rgba(99,102,241,0.3))"
               : "rgba(255,255,255,0.06)",
             borderColor: form.splitEnabled
@@ -325,6 +363,7 @@ function StreamSplitter({
             }}
           />
         </button>
+        </div>
       </div>
 
       {form.splitEnabled && (
@@ -338,6 +377,13 @@ function StreamSplitter({
               to   { opacity: 1; transform: translateY(0)   scaleY(1);    }
             }
           `}</style>
+
+          {/* Proposal error message */}
+          {proposalError && (
+            <div className="rounded-lg border border-red-400/30 bg-red-400/[0.06] px-3 py-2">
+              <p className="text-xs text-red-300">{proposalError}</p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
