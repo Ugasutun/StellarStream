@@ -7,3 +7,4 @@ describe("csv-template", () => {
     expect(csv).toBe(`${BULK_UPLOAD_TEMPLATE_HEADERS.join(",")}\n`);
   });
 });
+``
