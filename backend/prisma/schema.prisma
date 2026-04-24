@@ -342,6 +342,18 @@ model GlobalStats {
   updatedAt       DateTime @updatedAt
 }
 
+// V3 Splitter protocol statistics (#649)
+model GlobalStats_V3 {
+  id              String   @id @default("v3_global")
+  totalVolumeUsd  String   @default("0") // Cumulative USD volume through V3 splitter
+  dailyVolumeUsd  String   @default("0") // Last 24h volume
+  totalSplits     Int      @default(0)   // Total disbursements
+  totalRecipients Int      @default(0)   // Total unique recipients
+  updatedAt       DateTime @updatedAt
+
+  @@map("GlobalStats_V3")
+}
+
 // Daily TVL snapshots for growth charts
 model TvlSnapshot {
   id        String   @id @default(cuid())

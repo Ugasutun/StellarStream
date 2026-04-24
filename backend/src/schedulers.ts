@@ -6,6 +6,7 @@ import { AutopilotService } from "./services/autopilot.service.js";
 import { MultisigNotifierService } from "./services/multisig-notifier.service.js";
 import { archiveOldDisbursements } from "./services/disbursement-archive.service.js";
 import { LedgerConsistencyChecker } from "./services/ledger-consistency.service.js";
+import { V3VolumeAggregatorService } from "./services/v3-volume-aggregator.service.js";
 import { logger } from "./logger.js";
 
 const priceService = new PriceService();
@@ -93,6 +94,7 @@ export function initializeSchedulers() {
   scheduleMultisigNotifier();
   scheduleDisbursementArchive();
   scheduleLedgerConsistencyCheck();
+  scheduleV3VolumeAggregation();
 }
 
 /**
@@ -168,4 +170,23 @@ export function scheduleLedgerConsistencyCheck() {
   });
 
   logger.info("Ledger consistency checker started (every 6 hours)");
+}
+
+/**
+ * #649 — V3 Volume Aggregator: update GlobalStats_V3 daily at 00:05 UTC.
+ */
+export function scheduleV3VolumeAggregation() {
+  const v3Aggregator = new V3VolumeAggregatorService();
+
+  cron.schedule("5 0 * * *", async () => {
+    try {
+      logger.info("[V3VolumeAggregator] Starting daily aggregation");
+      await v3Aggregator.aggregateStats();
+      logger.info("[V3VolumeAggregator] Daily aggregation completed");
+    } catch (error) {
+      logger.error("[V3VolumeAggregator] Daily aggregation failed", error);
+    }
+  });
+
+  logger.info("V3 volume aggregator scheduler started (daily at 00:05 UTC)");
 }
