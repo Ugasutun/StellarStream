@@ -823,3 +823,78 @@ fn test_split_pull_rejects_share_below_minimum() {
         .try_split_pull(&s.owner, &recipients, &500i128, &None);
     assert_eq!(result, Err(Ok(Error::ShareBelowMinimum)));
 }
+
+// ── #930: SAC asset validation tests ──────────────────────────────────────────
+
+#[test]
+fn test_split_funds_rejects_invalid_asset() {
+    let s = setup();
+    let alice = Address::generate(&s.env);
+    let fake_asset = Address::generate(&s.env);
+
+    let mut recipients = Vec::new(&s.env);
+    recipients.push_back(Recipient {
+        address: alice.clone(),
+        share_bps: 10_000,
+    });
+
+    let result = s
+        .contract
+        .try_split_funds(&s.owner, &fake_asset, &recipients, &20_000_000i128);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_split_percentage_rejects_invalid_asset() {
+    let s = setup();
+    let alice = Address::generate(&s.env);
+    let fake_asset = Address::generate(&s.env);
+
+    let mut recipients = Vec::new(&s.env);
+    recipients.push_back(crate::PercentRecipient {
+        address: alice.clone(),
+        bps: 10_000,
+    });
+
+    let result =
+        s.contract
+            .try_split_percentage(&s.owner, &fake_asset, &20_000_000i128, &recipients);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_split_funds_accepts_valid_asset() {
+    let s = setup();
+    let alice = Address::generate(&s.env);
+
+    let mut recipients = Vec::new(&s.env);
+    recipients.push_back(Recipient {
+        address: alice.clone(),
+        share_bps: 10_000,
+    });
+
+    s.token
+        .transfer(&s.owner, &s.contract.address, &20_000_000i128);
+
+    let result =
+        s.contract
+            .try_split_funds(&s.owner, &s.token.address, &recipients, &20_000_000i128);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_split_percentage_accepts_valid_asset() {
+    let s = setup();
+    let alice = Address::generate(&s.env);
+
+    let mut recipients = Vec::new(&s.env);
+    recipients.push_back(crate::PercentRecipient {
+        address: alice.clone(),
+        bps: 10_000,
+    });
+
+    let result =
+        s.contract
+            .try_split_percentage(&s.owner, &s.token.address, &20_000_000i128, &recipients);
+    assert!(result.is_ok());
+}

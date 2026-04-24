@@ -40,4 +40,6 @@ pub enum Error {
     AlreadyProcessed = 29,
     ContractPaused = 30,
     InsufficientBalance = 31,
+    // #930: invalid SAC asset
+    InvalidAsset = 32,
 }

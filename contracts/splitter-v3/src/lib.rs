@@ -749,9 +749,9 @@ impl SplitterV3 {
             }
         }
 
-        // Security: validate asset is a live token contract by calling decimals().
+        // #930: Verify asset is a valid SAC token.
+        Self::_validate_sac_asset(&env, &asset)?;
         let token_client = token::Client::new(&env, &asset);
-        let _ = token_client.decimals();
 
         // ── Pre-flight: read-only balance check before any cross-contract call ─
         Self::check_balances_bulk(&env, &token_client, &sender, total_amount)?;
@@ -799,6 +799,8 @@ impl SplitterV3 {
         if recipients.is_empty() {
             return Err(Error::EmptyRecipients);
         }
+        // #930: Verify asset is a valid SAC token.
+        Self::_validate_sac_asset(&env, &asset)?;
         let mut bps_sum: u32 = 0;
         for r in recipients.iter() {
             bps_sum = bps_sum.checked_add(r.bps).ok_or(Error::Overflow)?;
@@ -985,6 +987,15 @@ impl SplitterV3 {
         if state == ContractState::Paused {
             return Err(Error::ContractPaused);
         }
+        Ok(())
+    }
+
+    /// #930: Validate that `asset` is a live SAC-compatible token contract.
+    /// Attempts a `symbol()` call; if the contract at that address doesn't
+    /// implement the Stellar token interface the call will fail.
+    fn _validate_sac_asset(env: &Env, asset: &Address) -> Result<(), Error> {
+        let client = token::Client::new(env, asset);
+        let _ = client.try_symbol().map_err(|_| Error::InvalidAsset)?;
         Ok(())
     }
 
