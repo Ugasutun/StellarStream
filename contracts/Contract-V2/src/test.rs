@@ -1515,3 +1515,272 @@ fn test_yield_bearing_stream() {
     
     assert_eq!(token_client.balance(&receiver), 500_000_000);
 }
+
+// ── Issue #934: Decommission Logic ───────────────────────────────────────────
+
+#[test]
+fn test_decommission_blocks_create_stream() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let (_, client) = setup_v2(&env, &admin);
+
+    client.decommission_contract();
+
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let (token_id, _, sac) = create_token(&env, &admin);
+    sac.mint(&sender, &1_000_000_000);
+
+    let result = client.try_create_stream(&StreamArgs {
+        sender: sender.clone(),
+        receiver: receiver.clone(),
+        token: token_id.clone(),
+        total_amount: 500_000_000,
+        start_time: 0,
+        cliff_time: 0,
+        end_time: 1000,
+        step_duration: 0,
+        multiplier_bps: 0,
+        vault_address: None,
+        yield_enabled: false,
+    });
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_decommission_withdraw_allowed_within_claim_window() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let admin = Address::generate(&env);
+    let (contract_id, client) = setup_v2(&env, &admin);
+
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let (token_id, token_client, sac) = create_token(&env, &admin);
+    sac.mint(&sender, &1_000_000_000);
+
+    client.create_stream(&StreamArgs {
+        sender: sender.clone(),
+        receiver: receiver.clone(),
+        token: token_id.clone(),
+        total_amount: 1_000_000_000,
+        start_time: 0,
+        cliff_time: 0,
+        end_time: 2000,
+        step_duration: 0,
+        multiplier_bps: 0,
+        vault_address: None,
+        yield_enabled: false,
+    });
+
+    // Decommission at t=1000 → claim_deadline = 1000 + 90*24*3600
+    client.decommission_contract();
+
+    // Advance to t=1500 (still within 90-day window)
+    env.ledger().set_timestamp(1500);
+    let withdrawn = client.withdraw(&0, &receiver);
+    assert!(withdrawn > 0);
+    assert!(token_client.balance(&receiver) > 0);
+}
+
+#[test]
+fn test_decommission_withdraw_blocked_after_claim_window() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let admin = Address::generate(&env);
+    let (_, client) = setup_v2(&env, &admin);
+
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let (token_id, _, sac) = create_token(&env, &admin);
+    sac.mint(&sender, &1_000_000_000);
+
+    client.create_stream(&StreamArgs {
+        sender: sender.clone(),
+        receiver: receiver.clone(),
+        token: token_id.clone(),
+        total_amount: 1_000_000_000,
+        start_time: 0,
+        cliff_time: 0,
+        end_time: 100_000_000,
+        step_duration: 0,
+        multiplier_bps: 0,
+        vault_address: None,
+        yield_enabled: false,
+    });
+
+    client.decommission_contract();
+
+    // Jump past the 90-day claim window (90 * 24 * 3600 = 7_776_000 seconds)
+    env.ledger().set_timestamp(1000 + 7_776_001);
+    let result = client.try_withdraw(&0, &receiver);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_decommission_only_admin() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let (_, client) = setup_v2(&env, &admin);
+
+    // Calling without init (no admin) should fail — but here admin is set.
+    // Verify state is Active before decommission.
+    assert_eq!(client.get_contract_state(), crate::types::ContractState::Active);
+    client.decommission_contract();
+    assert_eq!(client.get_contract_state(), crate::types::ContractState::Terminated);
+}
+
+// ── Issue #937: Sanctions Oracle ─────────────────────────────────────────────
+
+/// Minimal mock oracle contract for testing.
+mod mock_oracle {
+    use soroban_sdk::{contract, contractimpl, Address, Env, Vec};
+
+    #[contract]
+    pub struct MockOracle;
+
+    #[contractimpl]
+    impl MockOracle {
+        pub fn is_sanctioned(env: Env, address: Address) -> bool {
+            // Treat any address stored under key "BLOCKED" as sanctioned.
+            let blocked: Vec<Address> = env
+                .storage()
+                .instance()
+                .get(&soroban_sdk::symbol_short!("BLOCKED"))
+                .unwrap_or(Vec::new(&env));
+            blocked.contains(&address)
+        }
+
+        pub fn block(env: Env, address: Address) {
+            let mut blocked: Vec<Address> = env
+                .storage()
+                .instance()
+                .get(&soroban_sdk::symbol_short!("BLOCKED"))
+                .unwrap_or(Vec::new(&env));
+            blocked.push_back(address);
+            env.storage()
+                .instance()
+                .set(&soroban_sdk::symbol_short!("BLOCKED"), &blocked);
+        }
+    }
+}
+
+#[test]
+fn test_sanctions_oracle_blocks_cancel_to_sanctioned_receiver() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(500);
+
+    let admin = Address::generate(&env);
+    let (_, client) = setup_v2(&env, &admin);
+
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let (token_id, _, sac) = create_token(&env, &admin);
+    sac.mint(&sender, &1_000_000_000);
+
+    client.create_stream(&StreamArgs {
+        sender: sender.clone(),
+        receiver: receiver.clone(),
+        token: token_id.clone(),
+        total_amount: 1_000_000_000,
+        start_time: 0,
+        cliff_time: 0,
+        end_time: 1000,
+        step_duration: 0,
+        multiplier_bps: 0,
+        vault_address: None,
+        yield_enabled: false,
+    });
+
+    // Deploy and configure oracle
+    let oracle_id = env.register(mock_oracle::MockOracle, ());
+    let oracle_client = mock_oracle::MockOracleClient::new(&env, &oracle_id);
+    oracle_client.block(&receiver);
+
+    client.set_oracle_address(&oracle_id);
+
+    // Cancel should fail because receiver is sanctioned
+    let result = client.try_cancel(&0, &sender);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_sanctions_oracle_blocks_withdraw_to_sanctioned_beneficiary() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(500);
+
+    let admin = Address::generate(&env);
+    let (_, client) = setup_v2(&env, &admin);
+
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let (token_id, _, sac) = create_token(&env, &admin);
+    sac.mint(&sender, &1_000_000_000);
+
+    client.create_stream(&StreamArgs {
+        sender: sender.clone(),
+        receiver: receiver.clone(),
+        token: token_id.clone(),
+        total_amount: 1_000_000_000,
+        start_time: 0,
+        cliff_time: 0,
+        end_time: 1000,
+        step_duration: 0,
+        multiplier_bps: 0,
+        vault_address: None,
+        yield_enabled: false,
+    });
+
+    let oracle_id = env.register(mock_oracle::MockOracle, ());
+    let oracle_client = mock_oracle::MockOracleClient::new(&env, &oracle_id);
+    oracle_client.block(&receiver);
+
+    client.set_oracle_address(&oracle_id);
+
+    let result = client.try_withdraw(&0, &receiver);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_sanctions_oracle_no_oracle_set_allows_transfer() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(500);
+
+    let admin = Address::generate(&env);
+    let (_, client) = setup_v2(&env, &admin);
+
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let (token_id, token_client, sac) = create_token(&env, &admin);
+    sac.mint(&sender, &1_000_000_000);
+
+    client.create_stream(&StreamArgs {
+        sender: sender.clone(),
+        receiver: receiver.clone(),
+        token: token_id.clone(),
+        total_amount: 1_000_000_000,
+        start_time: 0,
+        cliff_time: 0,
+        end_time: 1000,
+        step_duration: 0,
+        multiplier_bps: 0,
+        vault_address: None,
+        yield_enabled: false,
+    });
+
+    // No oracle set — withdraw should succeed normally
+    let withdrawn = client.withdraw(&0, &receiver);
+    assert!(withdrawn > 0);
+    assert!(token_client.balance(&receiver) > 0);
+}

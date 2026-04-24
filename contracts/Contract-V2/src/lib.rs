@@ -11,9 +11,10 @@ mod v1_interface;
 use contracterror::Error;
 pub use types::{
     AdminTransferredEvent, BatchStreamsCreatedEvent, BeneficiaryTransferredV2Event, ClawbackRebalanceEvent,
-    ContractPausedEvent, ContractUnpausedEvent, MigrationEvent, Operation, OperationExecutedEvent,
-    OperationScheduledEvent, PermitArgs, PermitStreamCreatedEvent, StreamArgs, StreamCancelledV2Event,
-    StreamClaimV2Event, StreamCreatedV2Event, StreamMigratedEvent, StreamToppedUpEvent, StreamV2,
+    ContractPausedEvent, ContractState, ContractTerminatedEvent, ContractUnpausedEvent, MigrationEvent,
+    Operation, OperationExecutedEvent, OperationScheduledEvent, PermitArgs, PermitStreamCreatedEvent,
+    StreamArgs, StreamCancelledV2Event, StreamClaimV2Event, StreamCreatedV2Event, StreamMigratedEvent,
+    StreamToppedUpEvent, StreamV2,
 };
 use v1_interface::Client as V1Client;
 
@@ -24,6 +25,14 @@ pub struct Contract;
 pub trait VaultTrait {
     fn deposit(env: Env, amount: i128);
     fn withdraw(env: Env, amount: i128) -> i128; // returns actual amount withdrawn
+}
+
+/// Oracle interface for sanctions screening (#937).
+/// The contract calls `is_sanctioned` before any transfer to a recipient.
+#[soroban_sdk::contractclient(name = "SanctionsOracleClient")]
+pub trait SanctionsOracle {
+    /// Returns `true` if `address` is on the sanctions list.
+    fn is_sanctioned(env: Env, address: Address) -> bool;
 }
 
 #[contractimpl]
@@ -315,6 +324,15 @@ impl Contract {
         }
 
         // Perform transfer
+        // Sanctions check (#937)
+        Self::check_not_sanctioned(&env, &stream.beneficiary)?;
+        // Claim window check (#934): if terminated, only allow within 90-day window.
+        if storage::get_contract_state(&env) == ContractState::Terminated {
+            let deadline = storage::get_claim_deadline(&env).unwrap_or(0);
+            if env.ledger().timestamp() > deadline {
+                return Err(Error::ClaimWindowExpired);
+            }
+        }
         let token_client = soroban_sdk::token::TokenClient::new(&env, &stream.token);
         token_client.transfer(
             &env.current_contract_address(),
@@ -383,6 +401,10 @@ impl Contract {
         stream.withdrawn_amount = unlocked;
         stream.cancelled = true;
         storage::set_stream(&env, stream_id, &stream);
+
+        // Sanctions check (#937): query oracle for each recipient before transferring.
+        Self::check_not_sanctioned(&env, &stream.beneficiary)?;
+        Self::check_not_sanctioned(&env, &stream.sender)?;
 
         let token_client = soroban_sdk::token::TokenClient::new(&env, &stream.token);
         if to_receiver > 0 {
@@ -626,6 +648,67 @@ impl Contract {
     }
 
     // ----------------------------------------------------------------
+    // Issue #934 — Decommission / Self-Destruct Logic
+    // ----------------------------------------------------------------
+
+    /// Permanently terminates the contract. After this call:
+    /// - All state-mutating operations (create, cancel, migrate, etc.) are blocked.
+    /// - `withdraw` remains callable for 90 days so users can pull remaining funds.
+    pub fn decommission_contract(env: Env) -> Result<(), Error> {
+        let admin = storage::try_get_admin(&env)?;
+        admin.require_auth();
+
+        storage::set_contract_state(&env, &ContractState::Terminated);
+        let claim_deadline = env.ledger().timestamp() + storage::CLAIM_WINDOW_SECS;
+        storage::set_claim_deadline(&env, claim_deadline);
+
+        env.events().publish(
+            (symbol_short!("decomm"), admin.clone()),
+            ContractTerminatedEvent {
+                admin,
+                claim_deadline,
+                timestamp: env.ledger().timestamp(),
+            },
+        );
+        Ok(())
+    }
+
+    pub fn get_contract_state(env: Env) -> ContractState {
+        storage::get_contract_state(&env)
+    }
+
+    pub fn get_claim_deadline(env: Env) -> Option<u64> {
+        storage::get_claim_deadline(&env)
+    }
+
+    // ----------------------------------------------------------------
+    // Issue #937 — Sanctions Oracle Interface
+    // ----------------------------------------------------------------
+
+    /// Set the address of the external sanctions oracle. Admin-only.
+    pub fn set_oracle_address(env: Env, oracle: Address) -> Result<(), Error> {
+        let admin = storage::try_get_admin(&env)?;
+        admin.require_auth();
+        storage::set_oracle_address(&env, &oracle);
+        Ok(())
+    }
+
+    pub fn get_oracle_address(env: Env) -> Option<Address> {
+        storage::get_oracle_address(&env)
+    }
+
+    /// Query the oracle (if configured) and panic if `addr` is sanctioned.
+    fn check_not_sanctioned(env: &Env, addr: &Address) -> Result<(), Error> {
+        if let Some(oracle_addr) = storage::get_oracle_address(env) {
+            let oracle = SanctionsOracleClient::new(env, &oracle_addr);
+            if oracle.is_sanctioned(addr) {
+                return Err(Error::SanctionedAddress);
+            }
+        }
+        Ok(())
+    }
+
+    // ----------------------------------------------------------------
     // Compliance: Asset "Clawback" Support Logic
     // ----------------------------------------------------------------
 
@@ -690,6 +773,9 @@ impl Contract {
     fn require_not_paused(env: &Env) -> Result<(), Error> {
         if storage::is_paused(env) {
             return Err(Error::ContractPaused);
+        }
+        if storage::get_contract_state(env) == ContractState::Terminated {
+            return Err(Error::ContractTerminated);
         }
         Ok(())
     }

@@ -27,4 +27,7 @@ pub enum Error {
     OpNotScheduled = 23,
     NotBeneficiary = 24,
     VaultPaused = 25,
+    ContractTerminated = 26,
+    ClaimWindowExpired = 27,
+    SanctionedAddress = 28,
 }
