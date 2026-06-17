@@ -1056,22 +1056,10 @@ impl SplitterV3 {
             }
         }
 
-        // #926: use try_transfer — panic on any failure to trigger atomic rollback.
-        for r in recipients.iter() {
-            let amount = total_amount
-                .checked_mul(r.share_bps as i128)
-                .ok_or(Error::Overflow)?
-                / 10_000;
-            if amount > 0 {
-                let _ = token_client
-                    .try_transfer(&contract_addr, &r.address, &amount)
-                    .map_err(|_| Error::TransferFailed)?;
-                // #921: emit per-recipient payment event
-                emit_individual_payment(&env, &r.address, &asset, amount, r.share_bps);
         // Pull funds from sender into contract first.
         let _ = token_client
             .try_transfer(&sender, &contract_addr, &total_amount)
-            .map_err(|_| Error::TransferFailed)?;
+            .map_err(|_| { Self::_unlock(&env); Error::TransferFailed })?;
 
         match mode {
             SplitMode::Push => {
@@ -1084,7 +1072,9 @@ impl SplitterV3 {
                     if amount > 0 {
                         let _ = token_client
                             .try_transfer(&contract_addr, &r.address, &amount)
-                            .map_err(|_| Error::TransferFailed)?;
+                            .map_err(|_| { Self::_unlock(&env); Error::TransferFailed })?;
+                        // #921: emit per-recipient payment event
+                        emit_individual_payment(&env, &r.address, &asset, amount, r.share_bps);
                     }
                 }
             }
@@ -1102,10 +1092,9 @@ impl SplitterV3 {
             }
         }
 
-<<<<<<< feature/issue-913-reentrancy-guard
         // #913: release reentrancy lock after all external calls complete.
         Self::_unlock(&env);
-=======
+
         // #921: emit top-level split executed event after successful transfer loop
         emit_split_executed(&env, &sender, total_amount);
 
