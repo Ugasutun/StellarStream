@@ -44,7 +44,7 @@ export const useTransactionFeed = (): UseTransactionFeedReturn => {
   const [reconnecting, setReconnecting] = useState<boolean>(false);
   const [reconnectAttempt, setReconnectAttempt] = useState<number>(0);
   const [connectionLost, setConnectionLost] = useState<boolean>(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
@@ -64,17 +64,17 @@ export const useTransactionFeed = (): UseTransactionFeedReturn => {
       setReconnecting(true);
 
       reconnectTimeoutRef.current = setTimeout(() => {
-        if (socket) {
-          socket.connect();
+        if (socketRef.current) {
+          socketRef.current.connect();
         }
       }, delay);
     },
-    [socket]
+    []
   );
 
   // Initialize socket connection
   useEffect(() => {
-    const initSocket = async () => {
+    const initSocket = () => {
       try {
         const socketIO = io(process.env.NEXT_PUBLIC_API_URL!, {
           transports: ['websocket'],
@@ -82,7 +82,7 @@ export const useTransactionFeed = (): UseTransactionFeedReturn => {
           timeout: 10000,
         });
 
-        setSocket(socketIO);
+        socketRef.current = socketIO;
 
         socketIO.on('connect', () => {
           console.log('Connected to WebSocket server');
@@ -130,10 +130,6 @@ export const useTransactionFeed = (): UseTransactionFeedReturn => {
             return newFeed;
           });
         });
-
-        return () => {
-          socketIO.disconnect();
-        };
       } catch (err) {
         console.error('Failed to initialize WebSocket:', err);
         setError('Failed to initialize transaction feed');
@@ -142,19 +138,17 @@ export const useTransactionFeed = (): UseTransactionFeedReturn => {
     };
 
     initSocket();
-  }, [attemptReconnect]);
 
-  // Cleanup on unmount
-  useEffect(() => {
     return () => {
-      if (socket) {
-        socket.disconnect();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [socket]);
+  }, [attemptReconnect]);
 
   return {
     feed,

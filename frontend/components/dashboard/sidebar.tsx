@@ -134,8 +134,6 @@ export function Sidebar({ onOpenAuditLog }: SidebarProps) {
     { label: "Disbursements", href: "/dashboard/disbursements", icon: TrendingDown },
     { label: "Templates", href: "/dashboard/templates", icon: LayoutTemplate },
     { label: "Settings", href: "/dashboard/settings", icon: Settings },
-    { label: "Disbursements", href: "/dashboard/disbursements", icon: TrendingDown },
-    { label: "Templates", href: "/dashboard/templates", icon: LayoutTemplate },
     {
       label: "Approval Policies",
       href: "/dashboard/policies",

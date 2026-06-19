@@ -9,6 +9,15 @@ export const DESIGN_TOKENS = {
   // Colors
   // ─────────────────────────────────────────────────────────────
   colors: {
+    // Moon Dark Design System Colors
+    moon: {
+      background: '#0f1419',
+      card: '#1a1f27',
+      border: '#7c3aed',
+      textPrimary: '#f5f3ff',
+      textSecondary: '#a8adc1',
+      accent: '#00d4ff',
+    },
     // Primary - main brand color
     primary: {
       50: '#f0f9ff',

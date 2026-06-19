@@ -69,7 +69,7 @@ export function DisbursementHistoryCard({
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <p className="font-body text-sm font-bold text-white/80 truncate">{proposal.title}</p>
-          <p className="font-body text-[10px] text-white/30 mt-0.5">
+          <p className="font-body text-[10px] text-white/30 mt-0.5" suppressHydrationWarning>
             {fmtDate(proposal.createdAt)} · {proposal.recipients.length} recipient
             {proposal.recipients.length !== 1 ? "s" : ""}
           </p>
