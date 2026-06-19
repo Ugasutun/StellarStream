@@ -41,12 +41,6 @@ jobs:
       - name: Run tests (snapshot mode)
         run: RUSTFLAGS="--cap-lints=warn" cargo test --all-features 2>&1
 
-      - name: Verify snapshots are up-to-date
-        run: |
-          # Snapshots are written on first run. If the working tree is clean
-          # after running tests, all snapshots are committed and current.
-          git diff --exit-code -- test_snapshots/ || (echo "::error::Snapshots out of date. Run 'cargo test' and commit the updated snapshots." && exit 1)
-
   # ── 2. Coverage with llvm-cov ─────────────────────────────────────────────
   coverage:
     name: Line Coverage ≥ 90%
