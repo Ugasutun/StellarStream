@@ -90,8 +90,7 @@ export function DisbursementHistoryCard({
           <p className="truncate font-body text-sm font-bold text-white/80">
             {proposal.title}
           </p>
-
-          <p className="mt-0.5 font-body text-[10px] text-white/30">
+          <p className="mt-0.5 font-body text-[10px] text-white/30" suppressHydrationWarning>
             {fmtDate(proposal.createdAt)} · {proposal.recipients.length}{" "}
             recipient
             {proposal.recipients.length !== 1 ? "s" : ""}

@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import TransactionHistory from "@/components/dashboard/TransactionHistory";
 import { SanctionsFlagBanner, type SanctionsFlag } from "@/components/compliance/SanctionsFlagBanner";
 import RoadmapTeaser from "@/components/dashboard/RoadmapTeaser";
+import { HeroStats } from "@/components/dashboard";
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 const MOCK_FLAGS: SanctionsFlag[] = [
@@ -186,38 +187,7 @@ const daysLeft = Math.ceil((STREAM.endTime.getTime() - stableNow) / 86_400_000);
           </div>
 
           {/* ════ STATS OVERVIEW (4-Column Grid) ════ */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            {/* Card: Streamed */}
-            <div className="group rounded-2xl border border-white/8 bg-linear-to-br from-white/6 to-white/3 p-6 backdrop-blur-xl hover:border-cyan-500/30 hover:from-cyan-500/5 transition-all">
-              <p className="text-xs font-mono tracking-widest text-cyan-400/50 uppercase mb-3">Total Streamed</p>
-              <p className="text-3xl font-black text-cyan-400 mb-1 tabular-nums">
-                <LiveCounter base={STREAM.streamed} rate={STREAM.ratePerSecond} />
-              </p>
-              <p className="text-xs text-white/40">{STREAM.token}</p>
-            </div>
-
-            {/* Card: Remaining */}
-            <div className="group rounded-2xl border border-white/8 bg-linear-to-br from-white/6 to-white/3 p-6 backdrop-blur-xl hover:border-emerald-500/30 hover:from-emerald-500/5 transition-all">
-              <p className="text-xs font-mono tracking-widest text-emerald-400/50 uppercase mb-3">Remaining</p>
-              <p className="text-3xl font-black text-emerald-400 mb-1 tabular-nums">{fmt(remaining, 0)}</p>
-              <p className="text-xs text-white/40">{STREAM.token}</p>
-            </div>
-
-            {/* Card: Time Left */}
-            <div className="group rounded-2xl border border-white/8 bg-linear-to-br from-white/6 to-white/3 p-6 backdrop-blur-xl hover:border-violet-500/30 hover:from-violet-500/5 transition-all">
-              <p className="text-xs font-mono tracking-widest text-violet-400/50 uppercase mb-3">Time Left</p>
-              <p className="text-3xl font-black text-violet-400 mb-1">{daysLeft}</p>
-              <p className="text-xs text-white/40">days</p>
-            </div>
-
-            {/* Card: Yield */}
-            <div className="group rounded-2xl border border-white/8 bg-linear-to-br from-white/6 to-white/3 p-6 backdrop-blur-xl hover:border-amber-500/30 hover:from-amber-500/5 transition-all">
-              <p className="text-xs font-mono tracking-widest text-amber-400/50 uppercase mb-3">Yield Earned</p>
-              <p className="text-3xl font-black text-amber-400 mb-1 tabular-nums">{fmt(STREAM.yieldEarned)}</p>
-              <p className="text-xs text-white/40">8.2% APY</p>
-            </div>
-          </div>
+          <HeroStats />
 
           {/* ════ MAIN CONTENT (2-Column Layout) ════ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -278,8 +248,8 @@ const daysLeft = Math.ceil((STREAM.endTime.getTime() - stableNow) / 86_400_000);
                         </div>
                         <div>
                           <p className="text-xs text-white/40 mb-1">{item.label}</p>
-                          <p className="text-sm font-semibold text-white">{fmtDate(item.date)}</p>
-                          <p className="text-xs text-white/50 mt-0.5">{fmtTime(item.date)}</p>
+                          <p className="text-sm font-semibold text-white" suppressHydrationWarning>{fmtDate(item.date)}</p>
+                          <p className="text-xs text-white/50 mt-0.5" suppressHydrationWarning>{fmtTime(item.date)}</p>
                         </div>
                       </div>
                     ))}
@@ -318,7 +288,7 @@ const daysLeft = Math.ceil((STREAM.endTime.getTime() - stableNow) / 86_400_000);
                 <div className="mt-6 text-center">
                   <p className="text-xs text-white/40 mb-2">Completion</p>
                   <p className="text-4xl font-black text-white mb-2">{pct.toFixed(1)}%</p>
-                  <p className="text-xs text-white/50">{daysLeft} days remaining</p>
+                  <p className="text-xs text-white/50" suppressHydrationWarning>{daysLeft} days remaining</p>
                 </div>
               </div>
 

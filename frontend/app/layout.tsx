@@ -37,6 +37,31 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          id="google-fonts-async"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+          media="print"
+          suppressHydrationWarning
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var link = document.getElementById('google-fonts-async');
+                if (link) {
+                  var cb = function() { link.media = 'all'; };
+                  link.addEventListener('load', cb);
+                  if (link.sheet) cb();
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className="antialiased flex flex-col min-h-screen bg-black text-white"
         style={{
