@@ -139,7 +139,7 @@ fn test_resolve_dispute() {
     client.resolve_dispute(&stream_id, &arbiter, &6000);
 
     let stream = client.get_stream(&stream_id);
-    assert!(stream.cancelled);
+    assert_eq!(stream.state, crate::types::StreamState::Closed);
 
     let token_client = TokenClient::new(&env, &token_address);
     assert_eq!(token_client.balance(&receiver), 600);

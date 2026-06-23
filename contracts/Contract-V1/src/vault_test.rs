@@ -268,5 +268,5 @@ fn test_cancel_stream_with_vault() {
 
     // Verify stream is cancelled
     let stream = client.get_stream(&stream_id);
-    assert!(stream.cancelled);
+    assert_eq!(stream.state, crate::types::StreamState::Closed);
 }

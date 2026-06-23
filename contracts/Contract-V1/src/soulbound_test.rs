@@ -367,7 +367,7 @@ fn test_soulbound_stream_cancellable_by_sender() {
 
     // Verify cancellation succeeded
     let stream = client.get_stream(&stream_id);
-    assert!(stream.cancelled, "Stream should be cancelled");
+    assert_eq!(stream.state, crate::types::StreamState::Closed, "Stream should be cancelled");
 
     // Verify sender received unvested tokens back
     let sender_balance_after = token_client.balance(&sender);

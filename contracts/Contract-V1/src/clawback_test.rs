@@ -74,7 +74,7 @@ fn test_governance_clawback() {
 
     // Verify stream is cancelled
     let stream = client.get_stream(&stream_id);
-    assert!(stream.cancelled);
+    assert_eq!(stream.state, crate::types::StreamState::Closed);
 
     // Verify issuer received the funds
     let token_client = TokenClient::new(&env, &token_address);
